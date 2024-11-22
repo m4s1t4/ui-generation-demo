@@ -1,51 +1,43 @@
 import { tool as createTool } from 'ai'
 import { z } from 'zod'
 
-// Interfaz para la respuesta de Serper
-interface SerperVideo {
-  title: string
-  link: string
-  thumbnail: string
-  duration?: string
-  views?: number
-  date?: string
-}
-
 // Schema para los parámetros de búsqueda de videos
 export const videoSearchSchema = z.object({
   query: z.string().describe('The query to search for videos'),
   max_results: z.coerce
     .number()
     .default(5)
-    .describe('The maximum number of video results to return')
+    .describe('The maximum number of video results to return'),
+  search_depth: z
+    .enum(['basic', 'advanced'])
+    .default('basic')
+    .describe('The depth of the video search')
 })
 
-// Schema para los resultados de videos
-const VideoResult = z.object({
+// Schema para la respuesta de Serper
+const SerperVideoResult = z.object({
   title: z.string(),
-  url: z.string().url(),
-  thumbnailUrl: z.string().url().optional(),
+  link: z.string(),
+  snippets: z.array(z.string()).optional(),
+  thumbnailUrl: z.string().optional(),
+  thumbnail: z.string().optional(),
   duration: z.string().optional(),
-  platform: z.string(),
   views: z.number().optional(),
-  publishedDate: z.string().optional()
+  date: z.string().optional()
 })
 
-const VideoSearchResponse = z.object({
-  results: z.array(VideoResult),
-  query: z.string(),
-  totalResults: z.number().optional()
+const SerperResponse = z.object({
+  videos: z.array(SerperVideoResult),
+  searchParameters: z.object({
+    q: z.string()
+  }).optional()
 })
 
 // Types
-type VideoSearchParams = z.infer<typeof videoSearchSchema>
-type VideoSearchResponse = z.infer<typeof VideoSearchResponse>
+export type VideoSearchParams = z.infer<typeof videoSearchSchema>
 
 // Main search function
-async function searchVideos({
-  query,
-  max_results = 5
-}: VideoSearchParams): Promise<VideoSearchResponse> {
+async function searchVideos(params: VideoSearchParams) {
   try {
     const response = await fetch('https://google.serper.dev/videos', {
       method: 'POST',
@@ -54,8 +46,8 @@ async function searchVideos({
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        q: query,
-        num: max_results
+        q: params.query,
+        num: params.max_results
       })
     })
 
@@ -64,19 +56,19 @@ async function searchVideos({
     }
 
     const data = await response.json()
-    return VideoSearchResponse.parse({
-      results: (data.videos as SerperVideo[]).map(video => ({
+    const parsedData = SerperResponse.parse(data)
+
+    return {
+      videos: parsedData.videos.map(video => ({
         title: video.title,
-        url: video.link,
-        thumbnailUrl: video.thumbnail,
-        platform: 'youtube',
+        link: video.link,
+        thumbnail: video.thumbnailUrl || video.thumbnail || '',
         duration: video.duration,
         views: video.views,
-        publishedDate: video.date
+        date: video.date
       })),
-      query,
-      totalResults: data.videos.length
-    })
+      query: params.query
+    }
   } catch (error) {
     console.error('Video Search Error:', error)
     throw error
@@ -85,33 +77,26 @@ async function searchVideos({
 
 // Tool implementation
 export const videoSearchTool = createTool({
-  description: 'Search for videos from YouTube',
+  description: 'Search for videos from YouTube and other platforms',
   parameters: videoSearchSchema,
-  execute: async function({ query, max_results = 5 }) {
+  execute: async function(params: VideoSearchParams) {
     try {
-      const response = await searchVideos({
-        query,
-        max_results
-      })
+      const response = await searchVideos(params)
+
+      // Generar el texto de respuesta para el modelo
+      const videoList = response.videos
+        .map(video => `🎥 [${video.title}](${video.link})`)
+        .join('\n')
 
       return {
-        query,
-        videos: response.results.map(video => ({
-          title: video.title,
-          url: video.url,
-          thumbnailUrl: video.thumbnailUrl,
-          duration: video.duration,
-          platform: video.platform
-        })),
-        totalResults: response.totalResults
+        content: `Found ${response.videos.length} videos about "${params.query}":\n\n${videoList}`,
+        videos: response.videos
       }
     } catch (error) {
       console.error('Video Search Tool Error:', error)
       return {
-        query,
-        videos: [],
-        totalResults: 0,
-        error: 'Failed to fetch video results'
+        content: 'Sorry, I encountered an error while searching for videos.',
+        videos: []
       }
     }
   }

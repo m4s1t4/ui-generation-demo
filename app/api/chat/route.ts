@@ -1,101 +1,116 @@
-import { openai } from '@ai-sdk/openai';
-import { streamText } from 'ai';
-import { tools } from '@/lib/ai/tools/tavily';
-import { TavilySearchAPIError } from '@/lib/ai/tools/errors';
+import { openai } from '@ai-sdk/openai'
+// import { xai } from '@ai-sdk/xai';
+import { streamText, type Message } from 'ai'
+import { tools as tavilyTools } from '@/lib/ai/tools/tavily'
+import { tools as videoTools } from '@/lib/ai/tools/videsresearcher'
+import { ChatRequestSchema } from '@/lib/ai/agents/agentsscehmas'
+import { type CoreMessage } from 'ai'
+import { type TavilySearchParams } from '@/lib/ai/tools/tavily'
+import { type VideoSearchParams } from '@/lib/ai/tools/videsresearcher'
 
-interface ToolCall {
-  name: string;
-  arguments: {
-    query: string;
-    max_results: number;
-    search_depth: 'advanced';
-    include_domains?: string[];
-    exclude_domains?: string[];
-  };
-}
+const SYSTEM_PROMPT = `You are an advanced AI assistant with access to web search and video search capabilities.
+When users ask for information that requires internet search, use both tavilySearch and videoSearch to provide comprehensive answers. If the question does not require internet search, provide a concise answer without images or videos.
 
-const SYSTEM_PROMPT = `You are a helpful AI assistant with access to web search capabilities.
-When a user asks for current information or facts that might need verification, use the tavilySearch tool to find accurate information.
-Always provide your response in a clear and structured way using Markdown formatting.
+If you going to performe a werb search it's important to follow this workflow:
+1. You must use tavilySearch in firts place to perform the werbsearches
+2. Once the search has been completed, use videoSearch to obtain videos that provide usefull information
+3. Then when you have all this information you can respond with the established structure
 
-Guidelines:
-1. First, analyze the search results thoroughly
-2. Then, provide a comprehensive response that:
-   - Synthesizes the information from multiple sources
-   - Highlights key findings and trends
-   - Provides context and explanations
-   - References specific sources when making claims
+Your responses MUST follow this EXACT structure and style:
 
-3. Format your response using Markdown:
-   - Use ## for main sections
-   - Use ### for subsections
-   - Use * for bullet points
-   - Use ** for important concepts
-   - Use > for quotes or important highlights
+### **Introducción**
+Provide a brief, engaging overview (2-3 sentences) that:
+- Introduces the main topic clearly
+- Captures the reader's interest
+- Highlights why this topic is important or relevant
 
-4. Structure your analysis:
-   - Start with a brief overview
-   - Present main findings
-   - Discuss implications
-   - End with a conclusion
+Break down the information into clear, focused subsections:
 
-5. When relevant:
-   - Compare different perspectives
-   - Highlight recent developments
-   - Explain technical concepts
-   - Provide real-world examples
+##### Relevant Subsection Title
+- Present key information in clear, concise points
+- Include relevant statistics or data
+- Add quotes when relevant: > "exact quote" - Source
 
-Remember: Your role is to analyze and explain the information found, not just summarize it.`
+##### Another Relevant Subsection Title
+- Continue with organized, logical flow
+- Ensure each point connects to the main topic
+- Use bullet points for lists
+- Keep explanations clear and direct
+
+### **Imágenes y Videos**
+Present multimedia content with clear context only when internet search is involved:
+
+For images:
+![](imageUrl)
+- Point out key elements to notice
+
+For videos:
+[Video Title](videoUrl)
+- Connect the video to the topic discussed
+
+### **Conclusión**
+Wrap up with:
+- A clear summary of the main points
+- The most important takeaways
+- Any practical applications or next steps
+- Final thoughts that tie everything together
+
+Remember:
+- Keep language clear and direct
+- Use specific examples
+- Make multimedia content relevant and meaningful
+- Maintain a logical flow throughout
+- Focus on practical understanding
+- For videos, ALWAYS use the format: [Video Title](videoUrl)
+- Don't use <u> underline</u> to underline titles and important things `
 
 export async function POST(request: Request) {
   try {
-    const { messages } = await request.json();
+    const body = await request.json()
+    const { messages } = ChatRequestSchema.parse(body)
 
-    console.log('Incoming Messages:', messages);
+    console.log('Incoming Messages:', messages)
 
-    const result = streamText({
+    const result = await streamText({
       model: openai('gpt-4o'),
+      messages: messages as Message[],
       system: SYSTEM_PROMPT,
-      messages,
-      maxSteps: 5,
-      tools,
       temperature: 0.7,
-      toolChoice: 'auto',
-      onToolCall: async (toolCall: ToolCall) => {
-        console.log('Tool Call:', toolCall);
-        try {
-          if (toolCall.name in tools) {
-            const args = {
-              ...toolCall.arguments,
-              max_results: toolCall.arguments.max_results || 8,
-              search_depth: toolCall.arguments.search_depth || 'advanced'
-            };
-
-            const result = await tools[toolCall.name as keyof typeof tools].execute(args);
-            console.log('Tool Result:', result);
-
-            return {
-              ...result,
-              answer: result.answer
-            };
+      tools: {
+        tavilySearch: {
+          ...tavilyTools.tavilySearch,
+          execute: async (args: TavilySearchParams) => {
+            console.log('Executing tavilySearch:', args)
+            const result = await tavilyTools.tavilySearch.execute(args, {
+              messages: messages as CoreMessage[]
+            })
+            return result
           }
-          throw new TavilySearchAPIError(`Unknown tool: ${toolCall.name}`);
-        } catch (error) {
-          console.error('Tool Error:', error);
-          throw error;
+        },
+        videoSearch: {
+          ...videoTools.videoSearch,
+          execute: async (args: VideoSearchParams) => {
+            console.log('Executing videoSearch:', args)
+            const result = await videoTools.videoSearch.execute(args, {
+              messages: messages as CoreMessage[]
+            })
+            return result
+          }
         }
-      }
-    });
+      },
+      toolChoice: "auto",
+      maxSteps: 5
+    })
 
-    return result.toDataStreamResponse();
+    return result.toDataStreamResponse()
   } catch (error) {
-    console.error('Chat API Error:', error);
+    console.error('Chat API Error:', error)
     return new Response(JSON.stringify({
       error: 'Internal Server Error',
       details: error instanceof Error ? error.message : 'Unknown error'
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
-    });
+    })
   }
 }

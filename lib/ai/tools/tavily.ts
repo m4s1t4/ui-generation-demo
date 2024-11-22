@@ -47,8 +47,9 @@ const VideoResult = z.object({
 const TavilySearchResponse = z.object({
   results: z.array(TavilySearchResult),
   query: z.string(),
+  answer: z.string().optional(),
   images: z.array(z.string()).optional(),
-  videos: z.array(VideoResult).optional(), // Nuevo campo para videos
+  videos: z.array(VideoResult).optional(),
   relatedQuestions: z.array(z.object({
     text: z.string(),
     url: z.string()
@@ -56,8 +57,8 @@ const TavilySearchResponse = z.object({
 })
 
 // Types
-type TavilySearchParams = z.infer<typeof searchSchema>
-type TavilySearchResponse = z.infer<typeof TavilySearchResponse>
+export type TavilySearchParams = z.infer<typeof searchSchema>
+export type TavilySearchResponse = z.infer<typeof TavilySearchResponse>
 
 // Main search function
 async function searchWithTavily({
