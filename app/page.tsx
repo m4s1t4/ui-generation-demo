@@ -1,13 +1,21 @@
 'use client'
 
-import { useChat } from 'ai/react'
+import { useEffect } from 'react'
+import { useChat, Message } from 'ai/react'
 import EnhancedSearchResults from '@/components/enhanced-search-results'
-import { BotMessage } from '@/components/ai-response'
 import { VideoCarousel } from '@/components/video-results'
+import { BotMessage } from '@/components/ai-response'
+import { ErrorBoundary } from 'react-error-boundary'
 
-interface RelatedQuestion {
-  text: string
-  url: string
+
+// Componente para manejar errores
+function ErrorFallback({ error }: { error: Error }) {
+  return (
+    <div className="p-4 border border-red-500 rounded-lg">
+      <p className="text-red-500">Error al renderizar el contenido:</p>
+      <pre className="text-sm">{error.message}</pre>
+    </div>
+  )
 }
 
 interface ToolResult {
@@ -30,22 +38,32 @@ interface ToolResult {
     views?: number
     date?: string
   }>
-  relatedQuestions?: RelatedQuestion[]
+  relatedQuestions?: Array<{
+    text: string
+    url: string
+  }>
 }
 
-interface ToolInvocation {
-  id?: string
-  state: 'result' | 'partial-call' | 'call'
-  toolCallId: string
-  toolName: string
-  result?: ToolResult
+interface MessageWithTools extends Message {
+  toolInvocations?: Array<{
+    id?: string
+    state: 'result' | 'partial-call' | 'call'
+    toolCallId: string
+    toolName: string
+    result?: ToolResult
+  }>
 }
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat<MessageWithTools>({
     api: '/api/chat',
     initialMessages: []
   })
+
+  // Añadir logs para depuración
+  useEffect(() => {
+    console.log('Messages:', messages)
+  }, [messages])
 
   return (
     <div className="mx-auto max-w-4xl p-4 space-y-4">
@@ -65,67 +83,66 @@ export default function Chat() {
         </button>
       </form>
 
-      <div className="space-y-4">
-        {messages.map((message) => (
-          <div key={message.id}>
-            {message.role === 'user' && (
-              <div className="flex items-center space-x-2">
-                <span className="bg-blue-500 text-white px-2 py-1 rounded">You</span>
-                <p className="text-neutral-700">{message.content}</p>
-              </div>
-            )}
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <div className="space-y-4">
+          {messages.map((message, index) => {
+            const toolInvocations = (message as MessageWithTools).toolInvocations
 
-            {message.role === 'assistant' && (
-              <div className="space-y-4">
-                {(message.toolInvocations && message.toolInvocations.length > 0) ? (
-                  <>
-                    {message.toolInvocations.map((toolInvocation: ToolInvocation) => {
-                      if (toolInvocation.state === 'call') {
-                        return (
-                          <div key={toolInvocation.toolCallId} className="text-sm text-muted-foreground animate-pulse">
-                            {toolInvocation.toolName === 'videoSearch'
-                              ? '🎥 Buscando videos relacionados...'
-                              : '🔍 Investigando información...'}
+            // Log para depuración
+            console.log('Tool Invocations:', toolInvocations)
+
+            return (
+              <div key={index} className="space-y-4">
+                {toolInvocations?.map((toolInvocation, toolIndex) => {
+                  const { toolName, state, result } = toolInvocation
+
+                  // Log para depuración
+                  console.log('Processing tool:', { toolName, state, result })
+
+                  if (state === 'result' && result) {
+                    if (toolName === 'tavilySearch' && result.sources?.length > 0) {
+                      // Log para depuración
+                      console.log('Rendering tavilySearch with:', result)
+                      return (
+                        <ErrorBoundary key={`${index}-${toolIndex}`} FallbackComponent={ErrorFallback}>
+                          <div className="border rounded-lg p-4 bg-white/50">
+                            <EnhancedSearchResults
+                              query={result.query || ''}
+                              sources={result.sources || []}
+                              answer={result.answer}
+                              images={result.images || []}
+                              relatedQuestions={result.relatedQuestions || []}
+                            />
                           </div>
-                        )
-                      }
+                        </ErrorBoundary>
+                      )
+                    } else if (toolName === 'videoSearch' && result.videos && result.videos.length > 0) {
+                      // Log para depuración
+                      console.log('Rendering videoSearch with:', result.videos)
+                      return (
+                        <ErrorBoundary key={`${index}-${toolIndex}`} FallbackComponent={ErrorFallback}>
+                          <div className="border rounded-lg p-4 bg-white/50">
+                            <VideoCarousel videos={result.videos} />
+                          </div>
+                        </ErrorBoundary>
+                      )
+                    }
+                  }
+                  return null
+                })}
 
-                      if (toolInvocation.state === 'result' && toolInvocation.result) {
-                        const result = toolInvocation.result
-
-                        if (toolInvocation.toolName === 'tavilySearch' && result.sources) {
-                          return (
-                            <div key={toolInvocation.toolCallId} className="space-y-6">
-                              <EnhancedSearchResults
-                                query={result.query ?? input}
-                                sources={result.sources}
-                                answer={result.answer ?? ''}
-                                images={result.images ?? []}
-                                relatedQuestions={result.relatedQuestions ?? []}
-                              />
-                            </div>
-                          )
-                        }
-
-                        if (toolInvocation.toolName === 'videoSearch' && result.videos && result.videos.length > 0) {
-                          return (
-                            <div key={toolInvocation.toolCallId} className="space-y-6">
-                              <VideoCarousel videos={result.videos} />
-                            </div>
-                          )
-                        }
-                      }
-                      return null
-                    })}
-                  </>
-                ) : (
-                  <BotMessage messages={[message]} />
+                {message.role === 'assistant' && message.content && (
+                  <ErrorBoundary FallbackComponent={ErrorFallback}>
+                    <div className="rounded-lg bg-muted">
+                      <BotMessage messages={[message]} />
+                    </div>
+                  </ErrorBoundary>
                 )}
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+            )
+          })}
+        </div>
+      </ErrorBoundary>
     </div>
   )
 }

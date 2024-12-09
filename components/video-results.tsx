@@ -1,7 +1,8 @@
+'use client'
 import React from 'react'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { Card, CardContent } from "@/components/ui/card"
-
+import { Link } from 'lucide-react'
 interface Video {
   title: string
   link: string
@@ -16,6 +17,13 @@ interface VideoCarouselProps {
 }
 
 export function VideoCarousel({ videos = [] }: VideoCarouselProps) {
+  console.log('VideoCarousel props:', videos)
+
+  if (!videos || videos.length === 0) {
+    console.log('No videos provided')
+    return null
+  }
+
   const getVideoId = (url: string) => {
     try {
       const urlParams = new URLSearchParams(new URL(url).search)
@@ -25,12 +33,12 @@ export function VideoCarousel({ videos = [] }: VideoCarouselProps) {
     }
   }
 
-  if (!videos || videos.length === 0) {
-    return null
-  }
-
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
+      <div className="rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center w-fit">
+        <Link className="h-4 w-4 mr-1" />
+        Videos
+      </div>
       <Carousel className="w-full">
         <CarouselContent>
           {videos.map((video, index) => {

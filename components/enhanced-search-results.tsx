@@ -1,50 +1,52 @@
-"use client"
+'use client'
 
 import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Globe, Link } from 'lucide-react'
-import { Search, Image as ImageIcon, Video } from 'lucide-react'
-
-interface SearchResult {
-  title: string
-  url: string
-  content: string
-}
-
-interface RelatedQuestion {
-  text: string
-  url: string
-}
-
-interface VideoResult {
-  title: string
-  url: string
-  thumbnailUrl: string
-}
+import { Search, Image as ImageIcon } from 'lucide-react'
 
 interface EnhancedSearchResultsProps {
   query: string
-  images?: { url: string; description: string }[]
-  sources: SearchResult[]
-  answer: string
-  relatedQuestions?: RelatedQuestion[]
-  videos?: VideoResult[]
+  images?: Array<{
+    url: string
+    description: string
+  }>
+  sources: Array<{
+    title: string
+    url: string
+    content: string
+  }>
+  answer?: string
+  relatedQuestions?: Array<{
+    text: string
+    url: string
+  }>
 }
 
 export default function EnhancedSearchResults({
   query,
   images = [],
   sources,
+  answer,
   relatedQuestions = [],
-  videos = [],
 }: EnhancedSearchResultsProps) {
+  // Log para depuración
+  console.log('EnhancedSearchResults props:', { query, images, sources, answer, relatedQuestions })
+
+  // Validación de props
+  if (!sources || sources.length === 0) {
+    console.log('No sources provided')
+    return null
+  }
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-        <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 space-x-1">
-            <Search className="h-4 w-4" />
-            Search results for: <span> {query}</span>
-        </div>
+      <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 space-x-1">
+        <Search className="h-4 w-4" />
+        Search results for: <span> {query}</span>
+      </div>
+
       {/* Images Grid Section */}
       {images.length > 0 && (
         <div className="space-y-2">
@@ -106,33 +108,6 @@ export default function EnhancedSearchResults({
           ))}
         </div>
       </div>
-
-      {/* Videos Section */}
-      {videos.length > 0 && (
-        <div className="space-y-2">
-          <div className="rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center w-fit">
-            <Video className="h-4 w-4 mr-1" />
-            Videos
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {videos.slice(0, 4).map((video, index) => (
-              <Card key={index} className="overflow-hidden">
-                <CardContent className="p-2">
-                  <div className="aspect-video relative">
-                    <Image
-                      src={video.thumbnailUrl}
-                      alt={video.title}
-                      fill
-                      className="object-cover rounded-sm"
-                    />
-                  </div>
-                  <div className="mt-2 text-xs truncate">{video.title}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Related Questions */}
       {relatedQuestions.length > 0 && (

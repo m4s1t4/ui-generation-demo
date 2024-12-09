@@ -9,88 +9,9 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import type { Components } from 'react-markdown'
-import { VideoCarousel } from './video-results'
-import EnhancedSearchResults from './enhanced-search-results'
 
 interface BotMessageProps {
   messages: Message[]
-}
-
-interface SearchResult {
-  title: string
-  url: string
-  content: string
-}
-
-interface Video {
-  title: string
-  link: string
-  thumbnail: string
-  duration?: string
-  views?: number
-  date?: string
-}
-
-const getVideoId = (url: string): string | null => {
-  try {
-    if (url.includes('youtube.com/embed/')) {
-      return url.split('embed/')[1].split('"')[0]
-    }
-    const urlParams = new URLSearchParams(new URL(url).search)
-    return urlParams.get('v') || url.split('watch?v=')[1]
-  } catch {
-    return null
-  }
-}
-
-const extractSearchResults = (content: string): SearchResult[] => {
-  const results: SearchResult[] = []
-  const regex = /🔍\s*\[(.*?)\]\((.*?)\)\s*-\s*(.*?)(?=\n|$)/g
-  let match
-
-  while ((match = regex.exec(content)) !== null) {
-    results.push({
-      title: match[1],
-      url: match[2],
-      content: match[3]
-    })
-  }
-
-  return results
-}
-
-const extractVideos = (content: string): Video[] => {
-  const videos: Video[] = []
-  const regex = /🎥\s*\[(.*?)\]\((.*?)\)(?:\s*-\s*(?:Duración: (.*?)\s*\|\s*)?(?:Vistas: (.*?)\s*\|\s*)?(?:Fecha: (.*?))?)?(?=\n|$)/g
-  let match
-
-  while ((match = regex.exec(content)) !== null) {
-    videos.push({
-      title: match[1],
-      link: match[2],
-      thumbnail: '',
-      duration: match[3],
-      views: match[4] ? parseInt(match[4].replace(/,/g, '')) : undefined,
-      date: match[5]
-    })
-  }
-
-  return videos
-}
-
-const processContent = (content: string): string => {
-  return content
-    .replace(/\\\[([\s\S]*?)\\\]/g, (_, equation) => `$$${equation}$$`)
-    .replace(/\\$$([\s\S]*?)\\$$/g, (_, equation) => `$${equation}$`)
-    .replace(/<iframe[^>]*src="[^"]*embed\/([^"]*)"[^>]*><\/iframe>/g, (_, videoId) =>
-      `[Video](https://youtube.com/watch?v=${videoId})`
-    )
-    .replace(/\s*-\s*(?=\n|$)/g, '')
-    .replace(/<u>([^<]+)<\/u>/g, '$1')
-    .replace(/!\[.*?\]$$(.*?)$$/g, '![]($1)')
-    // Eliminar los resultados de búsqueda y videos del contenido principal
-    .replace(/🔍\s*\[.*?\]\(.*?\)\s*-\s*.*?(?=\n|$)/g, '')
-    .replace(/🎥\s*\[.*?\]\(.*?\)(?:\s*-\s*(?:Duración:.*?\s*\|\s*)?(?:Vistas:.*?\s*\|\s*)?(?:Fecha:.*?)?)?(?=\n|$)/g, '')
 }
 
 export function BotMessage({ messages = [] }: BotMessageProps) {
@@ -110,14 +31,21 @@ export function BotMessage({ messages = [] }: BotMessageProps) {
         {children}
       </h3>
     ),
-    p: ({ children, node, ...props }) => {
-      if (
-        node?.children?.length === 1 &&
-        node.children[0].type === 'element' &&
-        node.children[0].tagName === 'img'
-      ) {
-        return <>{children}</>
+    p: ({ children, node, ...props }: {
+      children: React.ReactNode
+      node?: {
+        children?: Array<{
+          type: string
+          tagName?: string
+        }>
       }
+      [key: string]: any
+    }) => {
+      // Check if the paragraph contains only an image
+      const hasOnlyImage = node?.children?.length === 1 && node.children[0].type === 'element' && node.children[0].tagName === 'img'
+
+      // If it's just an image, don't wrap in p tag
+      if (hasOnlyImage) return <>{children}</>
 
       return (
         <p className="text-base text-neutral-700 leading-relaxed mb-4 ml-4" {...props}>
@@ -141,36 +69,6 @@ export function BotMessage({ messages = [] }: BotMessageProps) {
         )}
       </figure>
     ),
-    a: ({ href, children, ...props }) => {
-      const videoId = getVideoId(href || '')
-      if (videoId) {
-        return (
-          <div className="block aspect-video w-full my-4">
-            <iframe
-              width="100%"
-              height="100%"
-              src={`https://www.youtube.com/embed/${videoId}`}
-              title={children?.toString() || 'YouTube video'}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="rounded-lg shadow-sm"
-            />
-          </div>
-        )
-      }
-      return (
-        <a
-          href={href}
-          {...props}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-700 hover:underline transition-colors duration-200"
-        >
-          {children}
-        </a>
-      )
-    },
     ul: ({ children, ...props }) => (
       <ul className="list-disc ml-6 mb-4 space-y-2" {...props}>
         {children}
@@ -198,33 +96,20 @@ export function BotMessage({ messages = [] }: BotMessageProps) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {messages.map((message, index) => {
-        const content = message.content || ''
-        const searchResults = extractSearchResults(content)
-        const videos = extractVideos(content)
-        const processedContent = processContent(content)
-
-        return (
-          <div key={index} className="space-y-6 px-4 py-6">
-            {searchResults.length > 0 && (
-              <EnhancedSearchResults results={searchResults} />
-            )}
-            {videos.length > 0 && (
-              <VideoCarousel videos={videos} />
-            )}
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[
-                [rehypeExternalLinks, { target: '_blank' }],
-                rehypeKatex
-              ]}
-              components={components}
-            >
-              {processedContent}
-            </ReactMarkdown>
-          </div>
-        )
-      })}
+      {messages.map((message, index) => (
+        <div key={index} className="space-y-6 px-4 py-6">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[
+              [rehypeExternalLinks, { target: '_blank' }],
+              rehypeKatex
+            ]}
+            components={components}
+          >
+            {message.content || ''}
+          </ReactMarkdown>
+        </div>
+      ))}
     </div>
   )
 }
