@@ -9,7 +9,7 @@ export const searchSchema = z.object({
     .number()
     .describe('The maximum number of results to return'),
   search_depth: z
-    .enum(['basic', 'advanced'])
+    .enum(['advanced'])
     .describe(
       'The depth of the search. Allowed values are "basic" or "advanced"'
     ),
@@ -36,20 +36,11 @@ const TavilySearchResult = z.object({
   imageUrl: z.string().url().optional()
 })
 
-const VideoResult = z.object({
-  title: z.string(),
-  url: z.string().url(),
-  thumbnailUrl: z.string().url().optional(),
-  duration: z.string().optional(),
-  source: z.string() // e.g., "YouTube", "Vimeo"
-})
 
 const TavilySearchResponse = z.object({
   results: z.array(TavilySearchResult),
   query: z.string(),
-  answer: z.string().optional(),
   images: z.array(z.string()).optional(),
-  videos: z.array(VideoResult).optional(),
   relatedQuestions: z.array(z.object({
     text: z.string(),
     url: z.string()
@@ -84,7 +75,6 @@ async function searchWithTavily({
         search_depth,
         include_domains,
         exclude_domains,
-        include_answer: true,
         include_images: true,
         include_raw_content: true
       })
@@ -133,22 +123,19 @@ export const tavilyTool = createTool({
         exclude_domains
       })
 
-      // Procesar las imágenes para el formato requerido
-      const processedImages = response.images?.map(url => ({
-        url,
-        description: 'Search result image' // Descripción por defecto
-      })) || []
+      // Formatear los resultados de búsqueda
+      const formattedResults = response.results
+        .map(result => `🔍 [${result.title}](${result.url})\n${result.content}`)
+        .join('\n\n')
 
+      // Formatear las imágenes
+      const formattedImages = response.images
+        ? response.images.map(url => `![Search result image](${url})`).join('\n')
+        : ''
+
+      // Combinar resultados y imágenes
       return {
-        query,
-        images: processedImages,
-        sources: response.results.map(result => ({
-          title: result.title,
-          url: result.url,
-          content: result.content
-        })),
-        answer: response.answer || 'No direct answer available',
-        relatedQuestions: response.relatedQuestions || []
+        content: `### Resultados de búsqueda para "${query}"\n\n${formattedResults}\n\n${formattedImages ? '### Imágenes relacionadas\n\n' + formattedImages : ''}`
       }
     } catch (error) {
       console.error('Tavily Tool Error:', error)

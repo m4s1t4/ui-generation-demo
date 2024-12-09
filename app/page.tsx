@@ -68,56 +68,60 @@ export default function Chat() {
       <div className="space-y-4">
         {messages.map((message) => (
           <div key={message.id}>
+            {message.role === 'user' && (
+              <div className="flex items-center space-x-2">
+                <span className="bg-blue-500 text-white px-2 py-1 rounded">You</span>
+                <p className="text-neutral-700">{message.content}</p>
+              </div>
+            )}
+
             {message.role === 'assistant' && (
-              <>
-                {message.toolInvocations?.length ? (
-                  message.toolInvocations.map((toolInvocation: ToolInvocation) => {
-                    if (toolInvocation.state === 'call') {
-                      return (
-                        <div key={toolInvocation.toolCallId} className="text-sm text-muted-foreground animate-pulse">
-                          {toolInvocation.toolName === 'videoSearch'
-                            ? '🎥 Buscando videos relacionados...'
-                            : '🔍 Investigando información...'}
-                        </div>
-                      )
-                    }
-
-                    if (toolInvocation.state === 'result' && toolInvocation.result) {
-                      const result = toolInvocation.result
-
-                      if (toolInvocation.toolName === 'tavilySearch') {
+              <div className="space-y-4">
+                {(message.toolInvocations && message.toolInvocations.length > 0) ? (
+                  <>
+                    {message.toolInvocations.map((toolInvocation: ToolInvocation) => {
+                      if (toolInvocation.state === 'call') {
                         return (
-                          <div key={toolInvocation.toolCallId} className="space-y-6">
-                            <EnhancedSearchResults
-                              query={result.query ?? input}
-                              sources={result.sources ?? []}
-                              answer={result.answer ?? 'No answer available'}
-                              images={result.images ?? []}
-                              relatedQuestions={result.relatedQuestions ?? []}
-                            />
+                          <div key={toolInvocation.toolCallId} className="text-sm text-muted-foreground animate-pulse">
+                            {toolInvocation.toolName === 'videoSearch'
+                              ? '🎥 Buscando videos relacionados...'
+                              : '🔍 Investigando información...'}
                           </div>
                         )
                       }
 
-                      if (toolInvocation.toolName === 'videoSearch' && result.videos && result.videos.length > 0) {
-                        return (
-                          <div key={toolInvocation.toolCallId} className="space-y-6">
-                            <VideoCarousel videos={result.videos} />
-                          </div>
-                        )
-                      }
-                    }
-                    return null
-                  })
-                ) : null}
+                      if (toolInvocation.state === 'result' && toolInvocation.result) {
+                        const result = toolInvocation.result
 
-                {message.content && (
-                  <div className="mt-6">
-                    <p className="text-lg font-semibold mb-4">Answer</p>
-                    <BotMessage messages={[message]} />
-                  </div>
+                        if (toolInvocation.toolName === 'tavilySearch' && result.sources) {
+                          return (
+                            <div key={toolInvocation.toolCallId} className="space-y-6">
+                              <EnhancedSearchResults
+                                query={result.query ?? input}
+                                sources={result.sources}
+                                answer={result.answer ?? ''}
+                                images={result.images ?? []}
+                                relatedQuestions={result.relatedQuestions ?? []}
+                              />
+                            </div>
+                          )
+                        }
+
+                        if (toolInvocation.toolName === 'videoSearch' && result.videos && result.videos.length > 0) {
+                          return (
+                            <div key={toolInvocation.toolCallId} className="space-y-6">
+                              <VideoCarousel videos={result.videos} />
+                            </div>
+                          )
+                        }
+                      }
+                      return null
+                    })}
+                  </>
+                ) : (
+                  <BotMessage messages={[message]} />
                 )}
-              </>
+              </div>
             )}
           </div>
         ))}

@@ -6,11 +6,11 @@ export const videoSearchSchema = z.object({
   query: z.string().describe('The query to search for videos'),
   max_results: z.coerce
     .number()
-    .default(5)
+    .default(8)
     .describe('The maximum number of video results to return'),
   search_depth: z
-    .enum(['basic', 'advanced'])
-    .default('basic')
+    .enum(['advanced'])
+    .default('advanced')
     .describe('The depth of the video search')
 })
 
@@ -83,20 +83,26 @@ export const videoSearchTool = createTool({
     try {
       const response = await searchVideos(params)
 
-      // Generar el texto de respuesta para el modelo
-      const videoList = response.videos
-        .map(video => `🎥 [${video.title}](${video.link})`)
-        .join('\n')
+      // Formatear los resultados de videos
+      const formattedVideos = response.videos
+        .map(video => {
+          const details = [
+            video.duration ? `Duración: ${video.duration}` : '',
+            video.views ? `Vistas: ${video.views.toLocaleString()}` : '',
+            video.date ? `Fecha: ${video.date}` : ''
+          ].filter(Boolean).join(' | ')
+
+          return `🎥 [${video.title}](${video.link})\n${details ? `> ${details}` : ''}`
+        })
+        .join('\n\n')
 
       return {
-        content: `Found ${response.videos.length} videos about "${params.query}":\n\n${videoList}`,
-        videos: response.videos
+        content: `### Videos relacionados con "${params.query}"\n\n${formattedVideos}`
       }
     } catch (error) {
       console.error('Video Search Tool Error:', error)
       return {
-        content: 'Sorry, I encountered an error while searching for videos.',
-        videos: []
+        content: 'Lo siento, hubo un error al buscar videos.'
       }
     }
   }
