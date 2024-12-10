@@ -1,36 +1,36 @@
-"use client"
+"use client";
 
-import Image from "next/image"
-import { Card, CardContent } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Globe, Link } from 'lucide-react'
-import { BotMessage } from "./ai-response"
-import { Search, Image as ImageIcon, Video } from 'lucide-react'
+import Image from "next/image";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Globe, Link } from "lucide-react";
+import { BotMessage } from "./ai-response";
+import { Search, Image as ImageIcon, Video } from "lucide-react";
 
 interface SearchResult {
-  title: string
-  url: string
-  content: string
+  title: string;
+  url: string;
+  content: string;
 }
 
 interface RelatedQuestion {
-  text: string
-  url: string
+  text: string;
+  url: string;
 }
 
 interface VideoResult {
-  title: string
-  url: string
-  thumbnailUrl: string
+  title: string;
+  url: string;
+  thumbnailUrl: string;
 }
 
 interface EnhancedSearchResultsProps {
-  query: string
-  images?: { url: string; description: string }[]
-  sources: SearchResult[]
-  answer: string
-  relatedQuestions?: RelatedQuestion[]
-  videos?: VideoResult[]
+  query: string;
+  images?: { url: string; description: string }[];
+  sources: SearchResult[];
+  answer: string;
+  relatedQuestions?: RelatedQuestion[];
+  videos?: VideoResult[];
 }
 
 export default function EnhancedSearchResults({
@@ -42,10 +42,10 @@ export default function EnhancedSearchResults({
 }: EnhancedSearchResultsProps) {
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-        <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-            <Search className="h-4 w-4" />
-            Search results for: <span>{query}</span>
-        </div>
+      <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+        <Search className="h-4 w-4" />
+        Search results for: <span className="px-1">{query}</span>
+      </div>
       {/* Images Grid Section */}
       {images.length > 0 && (
         <div className="space-y-2">
@@ -98,7 +98,9 @@ export default function EnhancedSearchResults({
               </Avatar>
               <div className="space-y-1">
                 <div className="font-medium">{source.title}</div>
-                <div className="text-sm text-muted-foreground">{new URL(source.url).hostname}</div>
+                <div className="text-sm text-muted-foreground">
+                  {new URL(source.url).hostname}
+                </div>
               </div>
               <div className="ml-auto text-sm text-muted-foreground">
                 {index + 1}
@@ -154,5 +156,5 @@ export default function EnhancedSearchResults({
         </div>
       )}
     </div>
-  )
+  );
 }
